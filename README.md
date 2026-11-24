@@ -1,4 +1,214 @@
-# Bopple · 封面小球音乐播放器
+# Bopple · Album-Cover Music Player
+
+> Turn album covers into balls that bounce to the music.
+
+![license](https://img.shields.io/badge/license-MIT-blue)
+![electron](https://img.shields.io/badge/Electron-31-47848F)
+![single-file](https://img.shields.io/badge/app.html-single%20file-ff4d4f)
+
+![Bopple screenshot](screenshots/main.png)
+
+Bopple is a local music player: pick a music folder, and each track's album cover becomes a ball that falls from the top of the screen, stacks up in the window, collides with its neighbors, and can be dragged and flung around. While playing, bass (kick drums, bass lines) lifts the balls into a jump, vocal frequencies make them jitter, and drum hits trigger particle bursts — the cover *is* the ball, and the ball *is* the cover.
+
+The whole UI is a single **`app.html`** (vanilla JS + Canvas, no framework, no build step). Electron just turns it into a desktop app: it remembers your music folder and auto-scans & plays on the next launch.
+
+---
+
+## ✨ Features
+
+- **Cover = ball** — auto-parses embedded cover art from MP3 (ID3v2 / APIC), M4A (MP4 `covr`), and FLAC (`PICTURE`); tracks without covers use the built-in headphone cover.
+- **Music-driven physics** — Web Audio `AnalyserNode` separates bass from vocals: bass kicks lift the balls upward, vocals add high-frequency jitter, and drum hits trigger particle bursts.
+- **Solid collision feel** — spatial-hash broad phase + multi-iteration impulse solver, with sleeping, positional relaxation, and off-screen soft springs; resting stacks don't self-jitter.
+- **Adaptive fill** — the number of on-screen balls is derived from the window area; excess balls park off-screen and smoothly refill when the window grows or goes fullscreen; the "fill density" slider ranges from 0.5× to 1.6×.
+- **Staggered entrance + ease-out-back** — balls drop in one by one instead of flashing in all at once.
+- **Theme follows the cover** — the average cover color drives the background gradient, accent, and panel colors; the whole UI re-tints per album.
+- **Auto-saved config** — every slider / toggle / play mode / language / custom image is saved the moment you change it and restored on the next launch.
+- **Remembers your music folder** (desktop) — pick it once, then it auto-scans and shuffle-plays on every launch, no prompt.
+- **Runs as a single file** — open `app.html` directly in a browser for the full web version.
+
+---
+
+## 🖼️ Screenshots
+
+| First run | Advanced settings |
+| --- | --- |
+| ![First run](screenshots/first-run.png) | ![Advanced settings](screenshots/settings.png) |
+
+---
+
+## 🚀 Quick start
+
+### Option 1: open in the browser (zero dependencies)
+
+Double-click `app.html` and open it in a Chromium-based browser (Chrome / Edge) → click the background to pick a music folder (the browser asks for permission once) → start playing.
+
+> Firefox / Safari lack the File System Access API, so they fall back to a plain folder-picker dialog — everything still works.
+
+### Option 2: desktop app (recommended)
+
+Download `Bopple-win32-x64.zip` from [Releases](../../releases) (once published), unzip, and double-click `Bopple.exe`.
+
+Or build from source (Node.js 18+, pnpm or npm both work):
+
+```bash
+pnpm install        # or npm install
+pnpm run pack       # output: dist/Bopple-win32-x64/Bopple.exe
+```
+
+If Electron downloads slowly in your region, set a mirror before installing:
+
+```powershell
+$env:ELECTRON_MIRROR = "https://npmmirror.com/mirrors/electron/"
+pnpm install
+```
+
+Dev mode (no packaging):
+
+```bash
+pnpm start
+```
+
+---
+
+## 🎮 Usage
+
+| Action | Description |
+| --- | --- |
+| `Tab` | Open / close the settings panel |
+| `Esc` | Close the settings panel |
+| Click empty background | When no music is loaded, pick a music folder |
+| Drag a ball | Grab and move it; release to fling it at the drag velocity |
+| Bottom player | Previous / play-pause / next / seek bar |
+
+After music loads, a random track from the playlist starts; switching tracks drops the old balls and re-fills with new ones.
+
+---
+
+## 🎛️ Parameters
+
+Adjustable under Settings → Advanced (everything auto-saves):
+
+**Ball parameters**
+
+| Parameter | Range | Default | Description |
+| --- | --- | --- | --- |
+| Base size | 40–120 px | 74 px | Ball diameter base value |
+| Size spread | 0–50% | ±30% | Random per-ball size variation |
+| Ball count | 20–300 | 130 | Total balls spawned at once |
+| Entrance stagger | 0–40 ms | 15 ms | Delay added between successive balls |
+| Fill density | 0.5–1.6× | 1.00× | Multiplier for how many balls fit on screen |
+
+**Physics**
+
+| Parameter | Range | Default | Description |
+| --- | --- | --- | --- |
+| Gravity | 0–2000 | 800 | Higher = faster fall, denser stacking |
+| Mass | 0.5–10 | 2 | Affects momentum exchange on collision |
+| Restitution | 0.1–1.5 | 1.00 | Higher = bouncier; lower = clay-like |
+| Air damping | 0–5 | 1.0 | Velocity decay strength |
+| Max speed | 500–4000 | 2400 | Speed cap, prevents fling-through |
+
+**Particle effects**
+
+| Parameter | Range | Default | Description |
+| --- | --- | --- | --- |
+| Enable particles | on / off | on | Collision sparks |
+| Trigger speed | 0–1500 | 320 | Min collision speed to emit particles |
+| Count per burst | 1–30 | 8 | Particles per burst |
+| Cooldown (s) | 0–0.5 | 0.08 | Min interval between bursts |
+
+**Sensitivity**
+
+| Parameter | Range | Default | Description |
+| --- | --- | --- | --- |
+| Jump sensitivity (bass) | 0–3 | 0.7 | How high drum hits lift the balls |
+| Shake sensitivity (vocals) | 0–3 | 2.0 | High-frequency jitter from vocal frequencies |
+
+---
+
+## 💾 Data & privacy
+
+Bopple runs fully locally: **no network, no upload, no analytics**.
+
+- **Desktop config**: `%APPDATA%\Bopple\config.json` (sliders, play mode, language, custom image, music folder path)
+- **Browser config**: `localStorage` key `bopple_settings_v1` (same content)
+- **To reset**: close the app and delete the file above / clear `localStorage` — the app returns to its first-run state.
+
+The desktop build reaches the main process through `window.bopple` (exposed by `preload.js`) for "pick folder, scan files, read audio bytes by path"; audio is handed to `<audio>` as a Blob URL, so no local server is needed.
+
+---
+
+## 📁 Project structure
+
+```
+bopple/
+├─ app.html              # all UI + physics + audio analysis + cover parsing (single file, ~84 KB)
+├─ main.js               # Electron main process: window, config read/write, folder scan, IPC
+├─ preload.js            # contextBridge → window.bopple (config / pick folder / scan / read file)
+├─ icon.ico / icon.png   # app icon (multi-size ICO + 256px PNG)
+├─ scripts/pack.js       # packaging script (@electron/packager)
+├─ screenshots/          # README screenshots
+├─ package.json
+├─ README.md
+└─ LICENSE
+```
+
+---
+
+## 🔧 Implementation notes
+
+1. **Physics** — rebuilds a spatial hash for broad phase each frame; circle–circle narrow phase runs 4 impulse-solver iterations; bodies sleep after falling below a speed threshold for a few frames, so resting stacks don't jitter; 0.6 px of SLOP is allowed and position correction is applied at only 60% to avoid overshoot jitter.
+2. **Adaptive capacity** — `floor(window area / (π·r²·1.3) × density)` estimates how many balls fit on screen; extra balls `park` off the top edge and shrink/fade out, then smoothly refill as the window changes.
+3. **Audio analysis** — `MediaElementSource → AnalyserNode` (fftSize 1024); bass uses the first 7 bins, vocals bins 8–70, smoothed and used to drive jump and shake respectively.
+4. **Cover parsing** — hand-written ID3v2 (incl. APIC picture frames), MP4 (`covr` box), and FLAC (`PICTURE` block) parsers, pure `ArrayBuffer` manipulation, no third-party libraries.
+5. **Theme** — the cover is scaled to 40×40 and averaged to derive a background gradient and a set of CSS variables (`--accent` / `--panel` / `--border` …).
+6. **Desktop integration** — `contextIsolation: true` + `sandbox: true`, exposing only 6 methods through `contextBridge`; the main process owns `fs`, `dialog`, and config persistence.
+
+---
+
+## ❓ FAQ
+
+**First launch asks for a folder — can it be automatic?**
+The desktop build remembers the path after you pick it once, then auto-scans on launch without asking. The browser may require permission each time due to security policy (it remembers via a File System Access handle, but the browser decides whether to keep it).
+
+**Balls won't jump?**
+Browsers (and some OS autoplay policies) require a first click on the page — hit play or drag a ball — before audio actually starts. Confirm the player time is advancing and the track has bass content.
+
+**Some tracks have no cover?**
+Audio without embedded art uses the built-in headphone cover; you can also go to Settings → Ball appearance → upload a custom image to force every ball to show the same picture.
+
+**Which formats are supported?**
+`.mp3 .m4a .aac .flac .ogg .oga .opus .wav .mp4` (limited by Chromium's decoders; `wma` / `wv` are not supported).
+
+**Why is the exe ~180 MB?**
+Electron bundles an entire Chromium runtime. `pnpm run pack` already uses `--asar` to bundle app code; the size is mostly the runtime itself.
+
+**Windows says "Windows protected your PC"?**
+The exe is unsigned. Click "More info" → "Run anyway", or sign it yourself.
+
+---
+
+## 🤝 Contributing
+
+Issues and PRs are welcome. Before changing code, open `app.html` directly in a browser to debug — the UI, physics, and audio analysis are all in there; the desktop build is just a shell.
+
+- Code style: keep `app.html` a single file, vanilla JS, no third-party runtime dependencies.
+- In a PR, state which parameter / behavior you changed, ideally with a screenshot or recording.
+- This project ships no music files; please use audio from legitimate sources.
+
+---
+
+## 📄 License
+
+[MIT](LICENSE) © 2026 Bopple contributors
+
+Third-party components: Electron, Chromium (each under their own open-source licenses). No audio content is included.
+
+---
+
+---
+
+# Bopple · 封面小球音乐播放器（中文）
 
 > 把专辑封面变成会随音乐弹跳的小球。
 
@@ -203,19 +413,3 @@ exe 未做代码签名，点「更多信息」→「仍要运行」即可；也�
 [MIT](LICENSE) © 2026 Bopple contributors
 
 使用到的第三方组件：Electron、Chromium（各自遵循其开源许可证）。项目内不包含任何音频内容。
-
----
-
-## English
-
-**Bopple** is a local music player that turns album art into bouncing balls. Drop a folder of music in, and every track's cover becomes a ball that falls, collides, stacks and reacts to the music: bass kicks the balls upward, vocals add a high-frequency shake, and the whole UI theme follows the dominant color of the artwork.
-
-- Single-file UI (`app.html`, vanilla JS + Canvas, no build step) that also runs straight in the browser.
-- Electron shell adds a native folder picker, remembers your music folder, auto-scans it on launch, and persists every setting to `%APPDATA%\Bopple\config.json`.
-
-```bash
-pnpm install
-pnpm run pack     # → dist/Bopple-win32-x64/Bopple.exe
-```
-
-MIT licensed, no telemetry, no bundled audio.
