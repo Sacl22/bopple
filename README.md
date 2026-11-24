@@ -1,3 +1,19 @@
+<div align="center">
+
+[**English**](#english) · [**简体中文**](#chinese)
+
+</div>
+
+---
+
+> ⚠️ **This project is no longer maintained** — it is archived as-is and shared for learning & reference only. No further updates, bug fixes, or support will be provided.
+>
+> ⚠️ **本项目不再维护** —— 已按现状归档，仅供学习与参考。不再提供任何更新、修复或支持。
+
+---
+
+<a id="english"></a>
+
 # Bopple · Album-Cover Music Player
 
 > Turn album covers into balls that bounce to the music.
@@ -207,6 +223,8 @@ Third-party components: Electron, Chromium (each under their own open-source lic
 ---
 
 ---
+
+<a id="chinese"></a>
 
 # Bopple · 封面小球音乐播放器（中文）
 
