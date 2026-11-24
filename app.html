@@ -1,0 +1,1983 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bopple</title>
+<style>
+  :root {
+    --bg0:#0b0b10; --bg1:#14141c;
+    --panel:#16161d; --panel2:#1f1f28; --panel3:#2a2a35;
+    --border:#2c2c38;
+    --text:#e8e8ee; --muted:#9a9aa8;
+    --accent:#d6d6de; --accent2:#4a4a55;
+    --on-accent:#f4f4f6;
+    --panel-rgb:22,22,29;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { height:100%; overflow:hidden; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background:#0b0b10; color:var(--text);
+    user-select:none; -webkit-user-select:none;
+    position:relative;
+  }
+  #bg { position:fixed; inset:0; z-index:0; background:linear-gradient(180deg,#15151d 0%,#0a0a0f 100%); }
+  #stage { position:fixed; inset:0; z-index:1; }
+  #fx { position:fixed; top:0; left:0; pointer-events:none; z-index:20; }
+
+  .btn {
+    border:none; cursor:pointer; padding:8px 14px; border-radius:10px;
+    font-size:14px; font-weight:600; transition:transform .08s, background .15s, color .15s, filter .15s;
+    white-space:nowrap;
+  }
+  .btn:active { transform:scale(.95); }
+  .btn-primary { background:var(--accent2); color:var(--on-accent); }
+  .btn-primary:hover { filter:brightness(.92); }
+  .btn-ghost { background:var(--panel2); color:var(--muted); }
+  .btn-ghost:hover { background:var(--panel3); color:var(--text); }
+
+  .gear {
+    position:fixed; top:14px; left:14px; z-index:265;
+    height:40px; padding:0 16px; border-radius:12px; border:none; cursor:pointer;
+    background:rgba(var(--panel-rgb),.92); backdrop-filter:blur(10px);
+    box-shadow:0 8px 30px rgba(0,0,0,.5); font-size:14px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; color:var(--text);
+    transition:transform .15s, filter .15s;
+  }
+  .gear:hover { filter:brightness(1.12); }
+
+  .bg-hint {
+    position:fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+    z-index:5; color:var(--muted); font-size:15px; font-weight:600;
+    pointer-events:none; transition:opacity .4s;
+  }
+  .bg-hint.hidden { opacity:0; }
+  .bg-hint.text {
+    background:rgba(var(--panel-rgb),.6); padding:14px 22px; border-radius:14px;
+    backdrop-filter:blur(8px);
+  }
+  .tap-guide { position:relative; width:96px; height:96px; display:flex; align-items:center; justify-content:center; }
+  .tap-ring {
+    position:absolute; inset:0; border-radius:50%;
+    border:2px solid var(--accent); opacity:.6;
+    animation:tapPulse 2.2s ease-out infinite;
+    will-change:transform, opacity;
+  }
+  .tap-ring.r2 { animation-delay:1.1s; }
+  .tap-hand {
+    position:relative; color:var(--accent);
+    animation:tapBob 1.6s ease-in-out infinite;
+    filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));
+    will-change:transform;
+  }
+  .guide-wrap { display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .guide-logo {
+    width:200px; height:200px; display:block;
+    filter:drop-shadow(0 14px 34px rgba(0,0,0,.45));
+    animation:guideFloat 3.6s ease-in-out infinite;
+    will-change:transform;
+  }
+  .guide-text { font-size:14px; font-weight:600; color:var(--muted); margin-top:6px; }
+  @keyframes guideFloat {
+    0%,100% { transform:translateY(0); }
+    50% { transform:translateY(-8px); }
+  }
+  @keyframes tapPulse {
+    0% { transform:scale(.4); opacity:.7; }
+    100% { transform:scale(1.6); opacity:0; }
+  }
+  @keyframes tapBob {
+    0%,100% { transform:translateY(0); }
+    50% { transform:translateY(-6px); }
+  }
+
+  .settings-backdrop {
+    position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:260;
+    opacity:0; pointer-events:none; transition:opacity .25s;
+  }
+  .settings-backdrop.show { opacity:1; pointer-events:auto; }
+  .settings {
+    position:fixed; top:0; left:0; bottom:0; width:min(88vw,360px);
+    background:var(--panel); color:var(--text); z-index:270; display:flex; flex-direction:column;
+    transform:translateX(-102%); transition:transform .28s cubic-bezier(.2,.8,.2,1);
+    box-shadow:8px 0 40px rgba(0,0,0,.5);
+  }
+  .settings.open { transform:translateX(0); }
+  .settings-head {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0;
+  }
+  .settings-head span { font-size:17px; font-weight:800; }
+  .settings-head .x { border:none; background:var(--panel2); color:var(--muted); height:30px; padding:0 10px; border-radius:9px; cursor:pointer; font-size:13px; font-weight:600; }
+  .settings-head .x:hover { color:var(--text); }
+  .lang-switch { display:flex; gap:4px; }
+  .lang-btn {
+    border:none; cursor:pointer; height:30px; padding:0 10px; border-radius:9px;
+    background:var(--panel2); color:var(--muted); font-size:13px; font-weight:600;
+  }
+  .lang-btn.active { background:var(--accent2); color:var(--on-accent); }
+  .settings-body { flex:1; overflow:auto; padding:14px 16px 22px; }
+  .settings-body section { margin-bottom:20px; }
+  .settings-body h3 {
+    font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;
+    margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border);
+  }
+  .slider { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); font-weight:600; margin-bottom:10px; }
+  .slider span.val { min-width:42px; text-align:right; color:var(--accent); font-weight:700; }
+  .slider input[type=range] { flex:1; accent-color:var(--accent); }
+  .switch { display:inline-flex; align-items:center; gap:8px; font-size:14px; color:var(--text); font-weight:600; margin:0 8px 10px 0; cursor:pointer; }
+  .switch input { width:18px; height:18px; accent-color:var(--accent); }
+  .mode-row { display:flex; align-items:center; flex-wrap:wrap; gap:4px; margin-bottom:10px; }
+  .mode-row .lbl { font-size:13px; color:var(--muted); font-weight:600; margin-right:6px; }
+  .s-btn-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+  .nowplaying {
+    font-size:13px; color:var(--muted); background:var(--panel2); border-radius:10px;
+    padding:10px 12px; line-height:1.6; word-break:break-all;
+  }
+  .nowplaying b { color:var(--text); }
+
+  #advanced { margin-top:8px; padding-left:10px; border-left:2px solid var(--border); }
+  #advanced h4 { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin:14px 0 8px; }
+  #advanced h4:first-child { margin-top:2px; }
+
+  .s-preview-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  #preview {
+    width:44px; height:44px; border-radius:50%; overflow:hidden; background:var(--panel2);
+    display:flex; align-items:center; justify-content:center; font-size:28px;
+    border:2px solid var(--accent2); flex-shrink:0;
+  }
+  #preview img { width:100%; height:100%; object-fit:cover; }
+
+  .count { font-size:14px; font-weight:700; color:var(--text); margin-top:4px; }
+  .count b { color:var(--accent); font-size:18px; }
+  .hint { font-size:12px; color:var(--muted); margin-top:12px; line-height:1.8; }
+
+  .avatar { position:fixed; left:0; top:0; z-index:10; cursor:grab; will-change:transform; border-radius:50%; box-shadow:0 6px 18px rgba(0,0,0,.45); }
+  .avatar:active { cursor:grabbing; }
+  .avatar .vis {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  }
+  .pulse { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .pulse img {
+    width:100%; height:100%; object-fit:cover; border-radius:50%;
+    pointer-events:none;
+  }
+
+  .player {
+    position:fixed; left:50%; bottom:16px; transform:translateX(-50%);
+    display:flex; align-items:center; gap:12px; z-index:150;
+    background:rgba(var(--panel-rgb),.92); backdrop-filter:blur(10px);
+    padding:10px 16px; border-radius:16px; box-shadow:0 8px 30px rgba(0,0,0,.5);
+    max-width:min(96vw,700px); width:max-content; color:var(--text);
+  }
+  .player[hidden] { display:none; }
+  .player-cover { width:46px; height:46px; border-radius:50%; object-fit:cover; background:var(--panel2); flex-shrink:0; }
+  .player-meta { min-width:0; width:150px; }
+  .player-meta .t { font-size:14px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .player-meta .a { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .player-ctrl { display:flex; gap:6px; }
+  .pbtn { border:none; cursor:pointer; width:38px; height:38px; border-radius:50%; font-size:17px; background:var(--panel3); color:var(--accent); transition:transform .08s, filter .15s; display:flex; align-items:center; justify-content:center; }
+  .pbtn:hover { filter:brightness(1.15); }
+  .pbtn:active { transform:scale(.9); }
+  .pbtn.main { width:44px; height:44px; background:var(--accent2); color:var(--on-accent); font-size:18px; display:flex; align-items:center; justify-content:center; }
+  .seek { width:120px; accent-color:var(--accent); }
+  .ptime { font-size:12px; color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.62); z-index:500; display:none; align-items:center; justify-content:center; }
+  .overlay.show { display:flex; }
+  .panel {
+    background:var(--panel); color:var(--text); border:1px solid var(--border);
+    border-radius:18px; padding:24px; width:min(92vw,440px);
+    max-height:86vh; overflow:auto; box-shadow:0 20px 60px rgba(0,0,0,.6);
+  }
+  .panel h2 { font-size:19px; margin-bottom:12px; color:var(--text); }
+  .panel p { font-size:14px; color:var(--muted); margin-bottom:16px; line-height:1.7; }
+</style>
+</head>
+<body>
+  <div id="bg"></div>
+  <div id="stage"></div>
+  <canvas id="fx"></canvas>
+
+  <div id="bgHint" class="bg-hint">
+    <div class="tap-guide">
+      <span class="tap-ring"></span>
+      <span class="tap-ring r2"></span>
+      <svg class="tap-hand" viewBox="0 0 24 24" width="40" height="40" fill="currentColor"><path d="M6 3l13 7-6.5 1.6L10 18 6 3z"/></svg>
+    </div>
+  </div>
+
+  <div class="settings-backdrop" id="settingsBackdrop"></div>
+  <div class="settings" id="settings">
+    <div class="settings-head">
+      <span data-i18n="settings">设置</span>
+      <div class="lang-switch">
+        <button class="lang-btn" id="langZh">中文</button>
+        <button class="lang-btn" id="langEn">EN</button>
+      </div>
+    </div>
+    <div class="settings-body">
+      <section>
+        <h3 data-i18n="music">音乐</h3>
+        <div class="s-btn-row">
+          <button class="btn btn-primary" id="btnPickMusic" data-i18n="pickMusic">选择音乐文件</button>
+          <button class="btn btn-primary" id="btnPickFolder" data-i18n="pickFolder">选择文件夹</button>
+        </div>
+        <div class="mode-row">
+          <span class="lbl" data-i18n="playMode">播放模式：</span>
+          <label class="switch"><input type="radio" name="playMode" value="sequential"> <span data-i18n="sequential">顺序播放</span></label>
+          <label class="switch"><input type="radio" name="playMode" value="random" checked> <span data-i18n="random">随机播放</span></label>
+        </div>
+        <div class="nowplaying" id="nowPlaying">未加载音乐</div>
+      </section>
+
+      <section>
+        <h3 data-i18n="appearance">小球外观</h3>
+        <div class="s-preview-row">
+          <div id="preview"></div>
+          <button class="btn btn-primary" id="btnUpload" data-i18n="uploadImage">上传自定义图片</button>
+        </div>
+        <label class="switch"><input type="checkbox" id="useCustomToggle"> <span data-i18n="useCustom">用自定义图片作为小球</span></label>
+        <button class="btn btn-ghost" id="btnClear" data-i18n="clearAll">清空所有小球</button>
+        <div class="count"><span data-i18n="countPrefix">当前 </span><b id="count">0</b><span data-i18n="countSuffix"> 个小球</span></div>
+      </section>
+
+      <section>
+        <label class="switch"><input type="checkbox" id="advToggle"> <span data-i18n="advanced">高级设置</span></label>
+        <div id="advanced" style="display:none">
+          <h4 data-i18n="ballParams">小球参数</h4>
+          <label class="slider"><span data-i18n="baseSize">基准大小</span>
+            <input type="range" id="sizeRange" min="40" max="120" step="2" value="74">
+            <span class="val" id="sizeVal">74px</span>
+          </label>
+          <label class="slider"><span data-i18n="sizeSpread">大小范围</span>
+            <input type="range" id="spreadRange" min="0" max="0.5" step="0.01" value="0.30">
+            <span class="val" id="spreadVal">±30%</span>
+          </label>
+          <label class="slider"><span data-i18n="ballCount">小球数量</span>
+            <input type="range" id="waveRange" min="20" max="300" step="10" value="130">
+            <span class="val" id="waveVal">130</span>
+          </label>
+          <label class="slider"><span data-i18n="stagger">入场错峰</span>
+            <input type="range" id="staggerRange" min="0" max="40" step="5" value="15">
+            <span class="val" id="staggerVal">15ms</span>
+          </label>
+          <label class="slider"><span data-i18n="density">铺满密度</span>
+            <input type="range" id="densityRange" min="0.5" max="1.6" step="0.05" value="1.0">
+            <span class="val" id="densityVal">1.00×</span>
+          </label>
+
+          <h4 data-i18n="physics">物理</h4>
+          <label class="slider"><span data-i18n="gravity">重力</span>
+            <input type="range" id="gravRange" min="0" max="2000" step="50" value="800">
+            <span class="val" id="gravVal">800</span>
+          </label>
+          <label class="slider"><span data-i18n="mass">质量</span>
+            <input type="range" id="massRange" min="0.5" max="10" step="0.5" value="2">
+            <span class="val" id="massVal">2</span>
+          </label>
+          <label class="slider"><span data-i18n="restitution">弹性</span>
+            <input type="range" id="restRange" min="0.1" max="1.5" step="0.05" value="1">
+            <span class="val" id="restVal">1.00</span>
+          </label>
+          <label class="slider"><span data-i18n="airDamping">空气阻尼</span>
+            <input type="range" id="dampRange" min="0" max="5" step="0.1" value="1">
+            <span class="val" id="dampVal">1.0</span>
+          </label>
+          <label class="slider"><span data-i18n="maxSpeed">最大速度</span>
+            <input type="range" id="maxSpdRange" min="500" max="4000" step="100" value="2400">
+            <span class="val" id="maxSpdVal">2400</span>
+          </label>
+
+          <h4 data-i18n="particleFx">粒子特效</h4>
+          <label class="switch"><input type="checkbox" id="partToggle" checked> <span data-i18n="enableParticles">启用粒子</span></label>
+          <label class="slider"><span data-i18n="impactSpeed">触发速度</span>
+            <input type="range" id="impactRange" min="0" max="1500" step="20" value="320">
+            <span class="val" id="impactVal">320</span>
+          </label>
+          <label class="slider"><span data-i18n="burstCount">每次数量</span>
+            <input type="range" id="burstRange" min="1" max="30" step="1" value="8">
+            <span class="val" id="burstVal">8</span>
+          </label>
+          <label class="slider"><span data-i18n="cooldown">冷却(秒)</span>
+            <input type="range" id="cooldownRange" min="0" max="0.5" step="0.02" value="0.08">
+            <span class="val" id="cooldownVal">0.08</span>
+          </label>
+
+          <h4 data-i18n="sensitivity">灵敏度</h4>
+          <label class="slider"><span data-i18n="jumpSens">跳动灵敏度（低频）</span>
+            <input type="range" id="jumpSensRange" min="0" max="3" step="0.1" value="0.7">
+            <span class="val" id="jumpSensVal">0.7</span>
+          </label>
+          <label class="slider"><span data-i18n="shakeSens">抖动灵敏度（人声）</span>
+            <input type="range" id="shakeSensRange" min="0" max="3" step="0.1" value="2.0">
+            <span class="val" id="shakeSensVal">2.0</span>
+          </label>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="player" id="player" hidden>
+    <img class="player-cover" id="playerCover" alt="">
+    <div class="player-meta">
+      <div class="t" id="playerTitle">-</div>
+      <div class="a" id="playerArtist"></div>
+    </div>
+    <div class="player-ctrl">
+      <button class="pbtn" id="btnPrev"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6L18 6v12z"/></svg></button>
+      <button class="pbtn main" id="btnPlay"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+      <button class="pbtn" id="btnNext"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16 6h2v12h-2zM6 6l8.5 6L6 18z"/></svg></button>
+    </div>
+    <input type="range" class="seek" id="seek" min="0" max="1000" value="0">
+    <span class="ptime" id="playerTime">0:00 / 0:00</span>
+  </div>
+
+  <input type="file" id="file" accept="image/*" hidden>
+  <input type="file" id="musicFiles" accept="audio/*" multiple hidden>
+  <input type="file" id="musicFolder" webkitdirectory directory multiple hidden>
+  <audio id="audio"></audio>
+
+<script>
+  // ---------- 语言 / i18n ----------
+  const I18N = {
+    zh: {
+      title: 'Bopple',
+      settings: '设置',
+      music: '音乐',
+      pickMusic: '选择音乐文件',
+      pickFolder: '选择文件夹',
+      playMode: '播放模式：',
+      sequential: '顺序播放',
+      random: '随机播放',
+      noMusic: '未加载音乐',
+      appearance: '小球外观',
+      uploadImage: '上传自定义图片',
+      useCustom: '用自定义图片作为小球',
+      clearAll: '清空所有小球',
+      countPrefix: '当前 ',
+      countSuffix: ' 个小球',
+      advanced: '高级设置',
+      ballParams: '小球参数',
+      baseSize: '基准大小',
+      sizeSpread: '大小范围',
+      ballCount: '小球数量',
+      stagger: '入场错峰',
+      density: '铺满密度',
+      physics: '物理',
+      gravity: '重力',
+      mass: '质量',
+      restitution: '弹性',
+      airDamping: '空气阻尼',
+      maxSpeed: '最大速度',
+      particleFx: '粒子特效',
+      enableParticles: '启用粒子',
+      impactSpeed: '触发速度',
+      burstCount: '每次数量',
+      cooldown: '冷却(秒)',
+      sensitivity: '灵敏度',
+      jumpSens: '跳动灵敏度（低频）',
+      shakeSens: '抖动灵敏度（人声）',
+      noAudioFound: '未找到音乐文件（支持 mp3 / m4a / aac / flac / ogg / wav 等）',
+      nowPlaying: '正在播放：',
+      artist: '艺人：',
+      noMusicInFolder: '该文件夹里没有可播放的音乐',
+      readFolderFail: '读取文件夹失败，请重试或换一个文件夹',
+      tapToContinue: '点击背景继续播放上次的音乐文件夹',
+      tapToPick: '点击背景选择音乐文件夹'
+    },
+    en: {
+      title: 'Bopple',
+      settings: 'Settings',
+      music: 'Music',
+      pickMusic: 'Choose Audio Files',
+      pickFolder: 'Choose Folder',
+      playMode: 'Play mode:',
+      sequential: 'Sequential',
+      random: 'Shuffle',
+      noMusic: 'No music loaded',
+      appearance: 'Balls',
+      uploadImage: 'Upload Custom Image',
+      useCustom: 'Use custom image as balls',
+      clearAll: 'Clear All Balls',
+      countPrefix: 'Current ',
+      countSuffix: ' balls',
+      advanced: 'Advanced Settings',
+      ballParams: 'Ball Parameters',
+      baseSize: 'Base Size',
+      sizeSpread: 'Size Spread',
+      ballCount: 'Ball Count',
+      stagger: 'Entrance Stagger',
+      density: 'Fill Density',
+      physics: 'Physics',
+      gravity: 'Gravity',
+      mass: 'Mass',
+      restitution: 'Restitution',
+      airDamping: 'Air Damping',
+      maxSpeed: 'Max Speed',
+      particleFx: 'Particle FX',
+      enableParticles: 'Enable Particles',
+      impactSpeed: 'Impact Speed',
+      burstCount: 'Burst Count',
+      cooldown: 'Cooldown (s)',
+      sensitivity: 'Sensitivity',
+      jumpSens: 'Jump Sensitivity (Bass)',
+      shakeSens: 'Shake Sensitivity (Vocals)',
+      noAudioFound: 'No audio files found (supports mp3 / m4a / aac / flac / ogg / wav etc.)',
+      nowPlaying: 'Now playing: ',
+      artist: 'Artist: ',
+      noMusicInFolder: 'No playable music in this folder',
+      readFolderFail: 'Failed to read folder, please retry or choose another',
+      tapToContinue: 'Tap the background to resume the last folder',
+      tapToPick: 'Click the background to choose a music folder'
+    }
+  };
+  let lang = 'zh';
+  function tr(key){ return (I18N[lang] && I18N[lang][key]) || (I18N.zh[key] || key); }
+  function applyLang(){
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.getAttribute('data-i18n')); });
+    document.title = tr('title');
+    document.getElementById('langZh').classList.toggle('active', lang === 'zh');
+    document.getElementById('langEn').classList.toggle('active', lang === 'en');
+    updatePlayerUI();
+  }
+  function setLang(l){
+    if(l !== 'zh' && l !== 'en') l = 'zh';
+    lang = l;
+    try { localStorage.setItem('cma_lang', l); } catch(e){}
+    applyLang();
+    saveConfigSoon();
+  }
+  document.getElementById('langZh').onclick = () => setLang('zh');
+  document.getElementById('langEn').onclick = () => setLang('en');
+
+  // ---------- 状态 ----------
+  const DEFAULT_COVER = "data:image/png;base64,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";
+  let currentImage = null;
+  let currentCoverUrl = null;
+  let customImage = null;
+  let useCustom = false;
+  let currentColor = { r:255, g:255, b:255 };
+  let count = 0;
+  const MAX = 300;
+  const WALL = 0;
+
+  // ---------- 可调参数 ----------
+  let size = 74;
+  let waveCount = 130;
+  let gravity = 800;
+  let mass = 2;
+  let restitution = 1.0;
+  let damping = 1.0;
+  let maxSpeed = 2400;
+  let particlesEnabled = true;
+  let impactSpeedMin = 320;
+  let burstCount = 8;
+  let burstCooldown = 0.08;
+  let jumpSensitivity = 0.7;
+  let shakeSensitivity = 2.0;
+  let sizeSpread = 0.30;
+  let staggerStep = 15;   // 入场错峰：每个小球依次延后的毫秒数
+  let density = 1.0;      // 铺满密度：屏幕容纳小球数的倍率（越大越满）
+
+  // ---------- 固定调校 ----------
+  const PAIR_STOP = 60;
+  const SLEEP_SPEED = 40;
+  const SLEEP_FRAMES = 6;
+  const WAKE_SPEED = 100;
+  const BASS_FORCE = 1500;   // 低频向上推力
+  const SOFT_K = 70;         // 屏幕外引力（弹簧）刚度（调弱，减少挤压回弹）
+  const SOFT_DAMP = 2.5;     // 屏幕外额外阻尼
+  const MAX_EXIT = 800;      // 屏幕外缓冲 / 最大飞出距离
+  const SLOP = 0.6;          // 允许的微小穿透，避免挤压抖动
+  const POS_CORR = 0.6;      // 位置校正松弛系数（每次只纠正部分重叠，避免过冲抖动）
+  const SOLVE_ITER = 4;      // 碰撞解算迭代次数
+
+  function pairRest(){ return clamp(restitution / mass, 0.12, 0.85); }
+
+  const particles = [];
+  const MAX_PARTICLES = 240;
+
+  const avatars = [];
+  let nextId = 1;
+  const grid = new Map();
+
+  const stage = document.getElementById('stage');
+  const bg = document.getElementById('bg');
+  const fx = document.getElementById('fx');
+  const fctx = fx.getContext('2d');
+  const preview = document.getElementById('preview');
+  const countEl = document.getElementById('count');
+
+  function clamp(v, lo, hi){ return v < lo ? lo : (v > hi ? hi : v); }
+
+  // 入场缩放：0 → 略过冲 → 1，合并进 transform，避免每球一条 CSS 动画造成卡顿
+  const ENTRANCE_MS = 300;
+  function easeOutBack(t){
+    const c1 = 1.70158, c3 = c1 + 1;
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  }
+
+  // ---------- 平均色 ----------
+  function sampleColor(data, boost){
+    let r=0, g=0, b=0, n=0;
+    for(let i=0; i<data.length; i+=4){
+      const al = data[i+3];
+      if(al < 40) continue;
+      const a = al / 255;
+      r += data[i]*a; g += data[i+1]*a; b += data[i+2]*a; n += a;
+    }
+    if(n <= 0) return { r:255, g:255, b:255 };
+    let Rc = Math.round(r/n), Gc = Math.round(g/n), Bc = Math.round(b/n);
+    const bst = boost || 0;
+    Rc = clamp(Rc + bst, 0, 255); Gc = clamp(Gc + bst, 0, 255); Bc = clamp(Bc + bst, 0, 255);
+    return { r:Rc, g:Gc, b:Bc };
+  }
+
+  function computeImageColors(dataUrl, cb){
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = 40; c.height = 40;
+        const ctx = c.getContext('2d', { willReadFrequently:true });
+        ctx.drawImage(img, 0, 0, 40, 40);
+        const raw = sampleColor(ctx.getImageData(0,0,40,40).data, 0);
+        cb({
+          raw,
+          particle: { r:clamp(raw.r+50,0,255), g:clamp(raw.g+50,0,255), b:clamp(raw.b+50,0,255) }
+        });
+      } catch(e){ cb({ raw:{r:255,g:255,b:255}, particle:{r:255,g:255,b:255} }); }
+    };
+    img.onerror = () => cb({ raw:{r:255,g:255,b:255}, particle:{r:255,g:255,b:255} });
+    img.src = dataUrl;
+  }
+
+  function applyBackground(raw){
+    const top = { r:Math.round(raw.r*0.75), g:Math.round(raw.g*0.75), b:Math.round(raw.b*0.75) };
+    const mid = { r:Math.round(raw.r*0.5), g:Math.round(raw.g*0.5), b:Math.round(raw.b*0.5) };
+    const bot = { r:Math.round(raw.r*0.22), g:Math.round(raw.g*0.22), b:Math.round(raw.b*0.22) };
+    bg.style.background = 'linear-gradient(180deg, rgb('+top.r+','+top.g+','+top.b+') 0%, rgb('+mid.r+','+mid.g+','+mid.b+') 55%, rgb('+bot.r+','+bot.g+','+bot.b+') 100%)';
+  }
+
+  // ---------- 主题跟随封面平均色 ----------
+  function lum(c){ return (c.r*0.299 + c.g*0.587 + c.b*0.114) / 255; }
+  function mixCol(c1, c2, t){ return { r: c1.r + (c2.r - c1.r)*t, g: c1.g + (c2.g - c1.g)*t, b: c1.b + (c2.b - c1.b)*t }; }
+  function lighten(c, t){ return mixCol(c, {r:255,g:255,b:255}, t); }
+  function rgbStr(c){ return 'rgb(' + Math.round(c.r) + ',' + Math.round(c.g) + ',' + Math.round(c.b) + ')'; }
+
+  function applyTheme(raw){
+    const root = document.documentElement.style;
+    let accent = lighten(raw, 0.28);
+    if(lum(accent) < 0.42) accent = mixCol(accent, {r:255,g:255,b:255}, 0.35);
+    const accent2 = lighten(raw, 0.16);
+    const panel  = mixCol(raw, {r:10,g:10,b:15}, 0.90);
+    const panel2 = mixCol(raw, {r:20,g:20,b:28}, 0.84);
+    const panel3 = mixCol(raw, {r:34,g:34,b:44}, 0.74);
+    const border = mixCol(raw, {r:46,g:46,b:58}, 0.62);
+    const muted  = mixCol(raw, {r:150,g:150,b:166}, 0.40);
+    root.setProperty('--accent', rgbStr(accent));
+    root.setProperty('--accent2', rgbStr(accent2));
+    root.setProperty('--panel', rgbStr(panel));
+    root.setProperty('--panel2', rgbStr(panel2));
+    root.setProperty('--panel3', rgbStr(panel3));
+    root.setProperty('--border', rgbStr(border));
+    root.setProperty('--muted', rgbStr(muted));
+    root.setProperty('--panel-rgb', Math.round(panel.r)+','+Math.round(panel.g)+','+Math.round(panel.b));
+    root.setProperty('--on-accent', lum(accent2) > 0.55 ? '#141414' : '#ffffff');
+  }
+
+  function renderPreview(){
+    preview.innerHTML = '';
+    if(currentImage){
+      const img = document.createElement('img'); img.src = currentImage; preview.appendChild(img);
+    }
+  }
+  function updatePlayerCover(){
+    const cover = document.getElementById('playerCover');
+    if(currentImage) cover.src = currentImage;
+    else cover.removeAttribute('src');
+  }
+
+  function setCurrentImage(url, after){
+    currentImage = url;
+    computeImageColors(url, (c) => {
+      currentColor = c.particle;
+      applyBackground(c.raw);
+      applyTheme(c.raw);
+      if(after) after(c.particle);
+      renderPreview(); updatePlayerCover();
+    });
+  }
+
+  // ---------- 粒子 ----------
+  function spawnBurst(x, y, col, power){
+    const n = Math.min(burstCount, MAX_PARTICLES - particles.length);
+    for(let i=0; i<n; i++){
+      const ang = Math.random() * Math.PI * 2;
+      const spd = (50 + Math.random() * 170) * power;
+      const life = 0.3 + Math.random() * 0.25;
+      particles.push({
+        x, y,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd - 30,
+        life, maxLife: life,
+        size: 2 + Math.random() * 2.5,
+        r: col.r, g: col.g, b: col.b
+      });
+    }
+  }
+  function stepParticles(dt){
+    if(!particles.length) return;
+    for(let i=particles.length-1; i>=0; i--){
+      const p = particles[i];
+      p.life -= dt;
+      if(p.life <= 0){ particles.splice(i,1); continue; }
+      p.vy += gravity * dt * 0.4;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    }
+    fctx.clearRect(0, 0, fx.width, fx.height);
+    for(const p of particles){
+      fctx.globalAlpha = p.life / p.maxLife;
+      fctx.fillStyle = 'rgb(' + p.r + ',' + p.g + ',' + p.b + ')';
+      fctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+    }
+    fctx.globalAlpha = 1;
+  }
+
+  // ---------- 生成 / 移除 ----------
+  function makeAvatar(x, y, sz){
+    const a = {
+      id: nextId++, x, y, vx:0, vy:0,
+      dragging:false, sleeping:false, slowFrames:0, exiting:false, parked:false,
+      dragVX:0, dragVY:0, targetX:x, targetY:y, grabOX:0, grabOY:0,
+      lastX:0, lastY:0, lastT:0, lastBurst:0,
+      color: { r:currentColor.r, g:currentColor.g, b:currentColor.b },
+      size: sz, r: sz / 2,
+      scale: 0, bornAt: performance.now(),
+      bassAmp: 0.5 + Math.random() * 0.5,
+      pulseAmp: 0.5 + Math.random() * 0.5,
+      el:null, pulseEl:null, imgEl:null
+    };
+    const el = document.createElement('div');
+    el.className = 'avatar';
+    el.style.width = sz + 'px';
+    el.style.height = sz + 'px';
+    const vis = document.createElement('div'); vis.className = 'vis';
+    const pulse = document.createElement('div'); pulse.className = 'pulse';
+    const img = document.createElement('img');
+    if(currentImage) img.src = currentImage;
+    img.draggable = false;
+    img.decoding = 'async';
+    pulse.appendChild(img);
+    vis.appendChild(pulse);
+    el.appendChild(vis);
+    a.el = el; a.pulseEl = pulse; a.imgEl = img;
+
+    el.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      a.dragging = true;
+      a.sleeping = false; a.slowFrames = 0;
+      a.grabOX = e.clientX - a.x;
+      a.grabOY = e.clientY - a.y;
+      a.dragVX = 0; a.dragVY = 0;
+      a.vx = 0; a.vy = 0;
+      a.lastX = e.clientX; a.lastY = e.clientY; a.lastT = performance.now();
+      a.targetX = a.x; a.targetY = a.y;
+      try { el.setPointerCapture(e.pointerId); } catch(_) {}
+    });
+    el.addEventListener('pointermove', (e) => {
+      if(!a.dragging) return;
+      const now = performance.now();
+      const dtm = (now - a.lastT) / 1000;
+      if(dtm > 0){
+        const ivx = (e.clientX - a.lastX) / dtm;
+        const ivy = (e.clientY - a.lastY) / dtm;
+        a.dragVX = a.dragVX * 0.7 + ivx * 0.3;
+        a.dragVY = a.dragVY * 0.7 + ivy * 0.3;
+      }
+      a.lastX = e.clientX; a.lastY = e.clientY; a.lastT = now;
+      a.targetX = e.clientX - a.grabOX;
+      a.targetY = e.clientY - a.grabOY;
+    });
+    function release(e){
+      if(!a.dragging) return;
+      a.dragging = false;
+      a.vx = clamp(a.dragVX, -maxSpeed, maxSpeed);
+      a.vy = clamp(a.dragVY, -maxSpeed, maxSpeed);
+      a.dragVX = 0; a.dragVY = 0;
+      try { el.releasePointerCapture(e.pointerId); } catch(_) {}
+    }
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointercancel', release);
+
+    avatars.push(a);
+    count++; updateCount();
+    updateTransform(a);
+    return a;
+  }
+
+  function destroyBall(a){
+    const idx = avatars.indexOf(a);
+    if(idx < 0) return;
+    avatars.splice(idx, 1);
+    if(a._removeTimer){ clearTimeout(a._removeTimer); a._removeTimer = null; }
+    if(a.el.parentNode) a.el.parentNode.removeChild(a.el);
+    count = Math.max(0, count - 1); updateCount();
+  }
+
+  function updateTransform(a){
+    a.el.style.transform = 'translate3d(' + (a.x - a.size/2) + 'px,' + (a.y - a.size/2) + 'px,0) scale(' + a.scale + ')';
+  }
+
+  function randomBallSize(){
+    const k = 1 - sizeSpread + Math.random() * 2 * sizeSpread;
+    return clamp(size * k, 34, 160);
+  }
+
+  // 屏幕能容纳的小球数（按窗口面积估算，含间隙）
+  function screenCapacity(W, H){
+    const margin = 24;
+    const aw = Math.max(80, W - margin * 2);
+    const ah = Math.max(80, H - margin * 2);
+    const avgR = size / 2;
+    const perBall = Math.PI * avgR * avgR * 1.3;
+    const base = Math.max(10, Math.floor((aw * ah) / perBall));
+    return Math.max(10, Math.floor(base * density));
+  }
+  function parkBall(a){
+    // 平滑滑出屏幕上方并缩小淡出（冻结，不参与物理）
+    a.parked = true;
+    a.sleeping = false; a.slowFrames = 0;
+    a.bornAt = 0;
+    a.vx = 0; a.vy = 0; a.dragVX = 0; a.dragVY = 0;
+    a.el.style.transition = 'transform .3s ease-in';
+    a.scale = 0.01;
+    a.y = -a.r - 40;
+    updateTransform(a);
+    setTimeout(() => { if(a.parked) a.el.style.transition = ''; }, 320);
+  }
+  function unparkBall(a, W){
+    // 放回屏幕（从上方落下）
+    a.parked = false;
+    a.el.style.transition = '';
+    a.bornAt = performance.now();
+    a.x = clamp(24 + Math.random() * (W - 48), a.r, Math.max(a.r, W - a.r));
+    a.y = -a.r - Math.random() * 120;
+    a.vx = (Math.random() - 0.5) * 120;
+    a.vy = 60 + Math.random() * 200;
+    a.sleeping = false; a.slowFrames = 0;
+    updateTransform(a);
+  }
+
+  let pendingSpawn = 0;
+  let spawnGate = 0;
+  let spawnSeq = 0;
+  const SPAWN_PER_FRAME = 12;
+  function spawnWave(){
+    const hasOld = avatars.some(a => a.exiting);
+    spawnGate = performance.now() + (hasOld ? 320 : 0); // 有旧球才延迟，优先退场
+    pendingSpawn = waveCount;
+    spawnSeq = 0;
+  }
+  function spawnChunk(n){
+    const W = window.innerWidth, H = window.innerHeight;
+    const margin = 24;
+    const cap = screenCapacity(W, H);
+    const frag = document.createDocumentFragment();
+    for(let i = 0; i < n; i++){
+      const sz = randomBallSize();
+      const idx = spawnSeq;
+      let a;
+      if(idx < cap){
+        // 屏幕内：从上方落下
+        const x = clamp(margin + Math.random() * (W - margin * 2), sz/2, W - sz/2);
+        const y = -sz - Math.random() * H * 0.6;
+        a = makeAvatar(x, y, sz);
+        a.bornAt += idx * staggerStep;
+        a.vy = 80 + Math.random() * 260;
+        a.vx = (Math.random() - 0.5) * 160;
+      } else {
+        // 多余：停到屏幕外（上方）
+        const x = clamp(margin + Math.random() * (W - margin * 2), sz/2, W - sz/2);
+        a = makeAvatar(x, -sz - 60, sz);
+        parkBall(a);
+      }
+      spawnSeq++;
+      frag.appendChild(a.el);
+    }
+    stage.appendChild(frag);
+  }
+
+  function dropOutAll(){
+    const H = window.innerHeight;
+    for(const a of avatars){
+      a.exiting = true;
+      a.sleeping = false; a.slowFrames = 0;
+      a.vx = 0; a.vy = 0;
+      const dur = 0.4 + Math.random() * 0.25;
+      const targetY = H + a.size + 60;
+      a.el.style.transition = 'transform ' + dur + 's linear';
+      a.el.style.transform = 'translate3d(' + (a.x - a.size/2) + 'px, ' + targetY + 'px, 0)';
+      if(a._removeTimer) clearTimeout(a._removeTimer);
+      a._removeTimer = setTimeout(() => destroyBall(a), (dur + 0.1) * 1000);
+    }
+  }
+
+  // ---------- 支撑检测 ----------
+  function isSupported(a){
+    const H = window.innerHeight;
+    if(a.y >= H - a.r - 40) return true;
+    const cell = Math.max(size, 80);
+    const gx = Math.floor(a.x / cell), gy = Math.floor(a.y / cell);
+    for(let dx = -1; dx <= 1; dx++){
+      for(let dy = -1; dy <= 1; dy++){
+        const arr = grid.get((gx + dx) + ',' + (gy + dy));
+        if(!arr) continue;
+        for(const b of arr){
+          if(b === a) continue;
+          if(b.y <= a.y) continue;
+          if(Math.abs(b.x - a.x) > (a.r + b.r) * 0.9) continue;
+          if((b.y - a.y) - (a.r + b.r) < 2) return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // ---------- 物理 ----------
+  function resolve(a, b){
+    const min = a.r + b.r;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const dist2 = dx * dx + dy * dy;
+    const min2 = min * min;
+    if(dist2 >= min2) return;
+    let nx, ny;
+    let dist;
+    if(dist2 < 1e-12){
+      const ang = (a.id * 1.61803398875) % 6.28318530718; // 确定性方向，避免 Math.random
+      nx = Math.cos(ang); ny = Math.sin(ang);
+      dist = Math.sqrt(dist2);
+    } else {
+      dist = Math.sqrt(dist2);
+      nx = dx / dist; ny = dy / dist;
+    }
+    // 质量按面积（r²）：大球重、小球轻，缓解大小球挤压抖动
+    const invA = a.dragging ? 0 : 1 / (a.r * a.r);
+    const invB = b.dragging ? 0 : 1 / (b.r * b.r);
+    const invSum = invA + invB;
+    if(invSum <= 0) return;
+
+    const overlap = min - dist;
+    if(overlap <= SLOP) return;
+    const corr = overlap * POS_CORR;
+    a.x -= nx * corr * (invA / invSum);
+    a.y -= ny * corr * (invA / invSum);
+    b.x += nx * corr * (invB / invSum);
+    b.y += ny * corr * (invB / invSum);
+
+    const vn = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+    if(vn < 0){
+      const impact = -vn;
+      if(impact > WAKE_SPEED){ a.sleeping = false; b.sleeping = false; a.slowFrames = 0; b.slowFrames = 0; }
+      const now = performance.now() / 1000;
+      if(particlesEnabled && impact > impactSpeedMin && now - a.lastBurst > burstCooldown && now - b.lastBurst > burstCooldown){
+        a.lastBurst = b.lastBurst = now;
+        const cx = a.x + nx * a.r, cy = a.y + ny * a.r;
+        const col = (a.vx*a.vx + a.vy*a.vy >= b.vx*b.vx + b.vy*b.vy) ? a.color : b.color;
+        spawnBurst(cx, cy, col, clamp(impact / 1200, 0.3, 1));
+      }
+      if(impact >= PAIR_STOP){
+        // 低速接触用极低弹性（沉淀稳定），高速碰撞保留弹性
+        const rest = (impact < 220) ? 0.0 : pairRest();
+        const j = -(1 + rest) * vn / invSum;
+        a.vx -= j * invA * nx; a.vy -= j * invA * ny;
+        b.vx += j * invB * nx; b.vy += j * invB * ny;
+      }
+    }
+  }
+
+  function softBoundary(a, W, H, dt){
+    const k = SOFT_K, dmp = SOFT_DAMP, maxD = MAX_EXIT;
+    const HARD = 14;   // 穿透小于此值视为静止，用硬边界（消除软弹簧抖动）
+    let outside = false;
+    if(a.x < a.r){
+      const pen = a.r - a.x;
+      if(pen < HARD){ a.x = a.r; if(a.vx < 0) a.vx = 0; }
+      else { a.vx += k * pen * dt; outside = true; }
+    } else if(a.x > W - a.r){
+      const pen = a.x - (W - a.r);
+      if(pen < HARD){ a.x = W - a.r; if(a.vx > 0) a.vx = 0; }
+      else { a.vx -= k * pen * dt; outside = true; }
+    }
+    if(a.y < a.r){
+      const pen = a.r - a.y;
+      if(pen < HARD){ a.y = a.r; if(a.vy < 0) a.vy = 0; }
+      else { a.vy += k * pen * dt; outside = true; }
+    } else if(a.y > H - a.r){
+      const pen = a.y - (H - a.r);
+      if(pen < HARD){ a.y = H - a.r; if(a.vy > 0) a.vy = 0; }
+      else { a.vy -= k * pen * dt; outside = true; }
+    }
+    if(outside){
+      const f = Math.exp(-dmp * dt);
+      a.vx *= f; a.vy *= f;
+    }
+    a.x = clamp(a.x, a.r - maxD, W - a.r + maxD);
+    a.y = clamp(a.y, a.r - maxD, H - a.r + maxD);
+  }
+
+  function step(dt, now){
+    const W = window.innerWidth, H = window.innerHeight;
+    const cell = Math.max(size, 80);
+    const bassDrive = clamp(bassLevel + bassKick * 0.5, 0, 1.0) * jumpSensitivity;
+
+    // 先建一次网格（上一帧位置，排除退场球），供 isSupported 用
+    grid.clear();
+    for(const a of avatars){
+      if(a.exiting || a.parked || now < a.bornAt) continue;
+      const gx = Math.floor(a.x / cell), gy = Math.floor(a.y / cell);
+      const k = gx + ',' + gy;
+      let arr = grid.get(k);
+      if(!arr){ arr = []; grid.set(k, arr); }
+      arr.push(a);
+    }
+
+    for(const a of avatars){
+      if(a.exiting || a.parked || now < a.bornAt) continue;
+      if(a.dragging){
+        const minX = WALL + a.r, maxX = W - WALL - a.r;
+        const minY = WALL + a.r, maxY = H - WALL - a.r;
+        a.x = clamp(a.targetX, minX, maxX);
+        a.y = clamp(a.targetY, minY, maxY);
+        a.vx = clamp(a.dragVX, -maxSpeed, maxSpeed);
+        a.vy = clamp(a.dragVY, -maxSpeed, maxSpeed);
+        a.sleeping = false; a.slowFrames = 0;
+      } else if(a.sleeping){
+        a.vx = 0; a.vy = 0;
+        if(!isSupported(a) || bassLevel > 0.12){ a.sleeping = false; a.slowFrames = 0; }
+      } else {
+        const f = Math.exp(-damping * dt);
+        a.vx *= f; a.vy *= f;
+        a.vy += gravity * dt;
+        if(!a.exiting){
+          a.vy -= bassDrive * BASS_FORCE * a.bassAmp * dt;
+        }
+        a.x += a.vx * dt;
+        a.y += a.vy * dt;
+
+        if(!a.exiting){
+          const sp = Math.hypot(a.vx, a.vy);
+          if(sp < SLEEP_SPEED && isSupported(a)){
+            a.slowFrames++;
+            if(a.slowFrames >= SLEEP_FRAMES){ a.sleeping = true; a.vx = 0; a.vy = 0; }
+          } else {
+            a.slowFrames = 0;
+          }
+        }
+      }
+    }
+
+    // 重建网格（积分后位置），供碰撞用；排除退场球
+    grid.clear();
+    for(const a of avatars){
+      if(a.exiting || a.parked || now < a.bornAt) continue;
+      const gx = Math.floor(a.x / cell), gy = Math.floor(a.y / cell);
+      const k = gx + ',' + gy;
+      let arr = grid.get(k);
+      if(!arr){ arr = []; grid.set(k, arr); }
+      arr.push(a);
+    }
+    for(let it = 0; it < SOLVE_ITER; it++){
+      for(const a of avatars){
+        if(a.exiting || a.parked || now < a.bornAt) continue;
+        const gx = Math.floor(a.x / cell), gy = Math.floor(a.y / cell);
+        for(let dx = -1; dx <= 1; dx++){
+          for(let dy = -1; dy <= 1; dy++){
+            const arr = grid.get((gx + dx) + ',' + (gy + dy));
+            if(!arr) continue;
+            for(const b of arr){
+              if(a.id >= b.id) continue;
+              resolve(a, b);
+            }
+          }
+        }
+      }
+    }
+
+    for(const a of avatars){
+      if(a.dragging || a.exiting || a.parked || now < a.bornAt) continue;
+      softBoundary(a, W, H, dt);
+    }
+
+    const pulseV = clamp(vocalLevel * shakeSensitivity, 0, 2);
+    for(const a of avatars){
+      if(a.exiting || a.parked || now < a.bornAt) continue;
+      const base = clamp(0.85 + pulseV * a.pulseAmp * 0.8, 0.6, 2.2);
+      if(a.bornAt){
+        const t = (now - a.bornAt) / ENTRANCE_MS;
+        if(t < 1){ a.scale = base * easeOutBack(t); }
+        else { a.scale = base; a.bornAt = 0; }
+      } else {
+        a.scale = base;
+      }
+      updateTransform(a);
+    }
+    stepParticles(dt);
+  }
+
+  // ---------- 音频跳动 ----------
+  let audioCtx = null, analyser = null, freqData = null;
+  let bassLevel = 0, vocalLevel = 0, bassKick = 0;
+
+  function ensureAudioGraph(){
+    if(audioCtx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    try {
+      audioCtx = new AC();
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.75;
+      const src = audioCtx.createMediaElementSource(audio);
+      src.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      freqData = new Uint8Array(analyser.frequencyBinCount);
+    } catch(e){ audioCtx = null; analyser = null; }
+  }
+
+  function updateAudioEnergy(){
+    if(!analyser){ bassLevel = 0; vocalLevel = 0; bassKick = 0; return; }
+    analyser.getByteFrequencyData(freqData);
+    const n = freqData.length;
+    const bEnd = Math.min(7, n);
+    let bs = 0;
+    for(let i = 1; i < bEnd; i++) bs += freqData[i];
+    const bassRaw = bs / ((bEnd - 1) * 255);
+    let vs = 0, vc = 0;
+    for(let i = 8; i < n && i <= 70; i++){ vs += freqData[i]; vc++; }
+    const vocalRaw = vc ? vs / (vc * 255) : 0;
+    bassKick *= 0.85;
+    if(bassRaw > bassLevel * 1.3 && bassRaw > 0.12) bassKick = 1;
+    bassLevel += (bassRaw - bassLevel) * 0.4;
+    vocalLevel += (vocalRaw - vocalLevel) * 0.35;
+  }
+
+  let lastTime = performance.now();
+  function loop(now){
+    let dt = (now - lastTime) / 1000;
+    lastTime = now;
+    if(dt > 0.033) dt = 0.033;
+    if(pendingSpawn > 0 && now > spawnGate){
+      const n = Math.min(SPAWN_PER_FRAME, pendingSpawn);
+      spawnChunk(n);
+      pendingSpawn -= n;
+    }
+    updateAudioEnergy();
+    step(dt, now);
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  function resizeFx(){
+    fx.width = window.innerWidth;
+    fx.height = window.innerHeight;
+  }
+
+  // 窗口大小变化时，按容量重新分配屏幕内/屏幕外小球
+  let rebalanceTimer = 0;
+  function rebalance(){
+    const W = window.innerWidth, H = window.innerHeight;
+    const cap = screenCapacity(W, H);
+    const active = avatars.filter(a => !a.exiting && !a.parked);
+    const parked = avatars.filter(a => a.parked && !a.exiting);
+    if(active.length > cap){
+      let need = active.length - cap;
+      for(const a of active){
+        if(need <= 0) break;
+        if(a.dragging) continue;
+        parkBall(a);
+        need--;
+      }
+    } else if(active.length < cap && parked.length){
+      let need = Math.min(cap - active.length, parked.length);
+      for(const a of parked){
+        if(need <= 0) break;
+        unparkBall(a, W);
+        need--;
+      }
+    }
+  }
+  function onResize(){
+    resizeFx();
+    clearTimeout(rebalanceTimer);
+    rebalanceTimer = setTimeout(rebalance, 200);
+  }
+  window.addEventListener('resize', onResize);
+  resizeFx();
+
+  function updateCount(){ countEl.textContent = count; }
+
+  // ---------- 设置面板 ----------
+  const settingsEl = document.getElementById('settings');
+  const settingsBackdrop = document.getElementById('settingsBackdrop');
+  function openSettings(){ settingsEl.classList.add('open'); settingsBackdrop.classList.add('show'); }
+  function closeSettings(){ settingsEl.classList.remove('open'); settingsBackdrop.classList.remove('show'); }
+  function toggleSettings(){ settingsEl.classList.contains('open') ? closeSettings() : openSettings(); }
+  settingsBackdrop.addEventListener('pointerdown', closeSettings);
+  document.addEventListener('keydown', (e) => {
+    if(e.key === 'Tab'){ e.preventDefault(); toggleSettings(); }
+    else if(e.key === 'Escape'){ closeSettings(); }
+  });
+
+  document.getElementById('advToggle').onchange = (e) => {
+    document.getElementById('advanced').style.display = e.target.checked ? 'block' : 'none';
+    saveConfigSoon();
+  };
+
+  document.getElementById('btnClear').onclick = () => {
+    for(const a of avatars.slice()) destroyBall(a);
+    particles.length = 0;
+  };
+
+  // ---------- 自定义图片 ----------
+  document.getElementById('btnUpload').onclick = () => document.getElementById('file').click();
+  document.getElementById('file').onchange = (e) => {
+    const f = e.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      customImage = reader.result;
+      if(useCustom){
+        setCurrentImage(customImage, (col) => {
+          for(const a of avatars){ a.color = { r:col.r, g:col.g, b:col.b }; if(a.imgEl) a.imgEl.src = customImage; }
+        });
+      }
+      saveConfigSoon();
+    };
+    reader.readAsDataURL(f);
+  };
+  document.getElementById('useCustomToggle').onchange = (e) => {
+    useCustom = e.target.checked;
+    if(useCustom && customImage){
+      setCurrentImage(customImage, (col) => {
+        for(const a of avatars){ a.color = { r:col.r, g:col.g, b:col.b }; if(a.imgEl) a.imgEl.src = customImage; }
+      });
+    } else {
+      setCurrentImage(currentCoverUrl);
+    }
+    saveConfigSoon();
+  };
+
+  // ---------- 配置持久化（改动即存，下次打开自动恢复） ----------
+  const CFG_KEY = 'bopple_settings_v1';
+  let musicDir = '';        // Electron：上次使用的音乐文件夹路径
+  let configReady = false;  // 配置加载完成后才回写，避免被默认值覆盖
+  let saveTimer = 0;
+
+  function collectConfig(){
+    return {
+      size, waveCount, gravity, mass, restitution, damping, maxSpeed,
+      particlesEnabled, impactSpeedMin, burstCount, burstCooldown,
+      jumpSensitivity, shakeSensitivity, sizeSpread, staggerStep, density,
+      playMode, lang,
+      advanced: document.getElementById('advToggle').checked,
+      useCustom,
+      customImage: (customImage && customImage.length < 3000000) ? customImage : null,
+      musicDir
+    };
+  }
+  function saveConfigSoon(){
+    if(!configReady) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(persistConfig, 150);
+  }
+  function persistConfig(){
+    if(!configReady) return;
+    clearTimeout(saveTimer);
+    const cfg = collectConfig();
+    try { localStorage.setItem(CFG_KEY, JSON.stringify(cfg)); } catch(e){}
+    try { if(window.bopple && window.bopple.saveConfig) window.bopple.saveConfig(cfg); } catch(e){}
+  }
+  async function loadConfig(){
+    let cfg = null;
+    try { if(window.bopple && window.bopple.loadConfig) cfg = await window.bopple.loadConfig(); } catch(e){ cfg = null; }
+    if(!cfg || !Object.keys(cfg).length){
+      try { cfg = JSON.parse(localStorage.getItem(CFG_KEY) || 'null'); } catch(e){ cfg = null; }
+    }
+    return (cfg && typeof cfg === 'object') ? cfg : {};
+  }
+  function applyConfig(cfg){
+    if(!cfg || typeof cfg !== 'object') return;
+    const setRange = (id, v) => {
+      if(typeof v !== 'number' || !isFinite(v)) return;
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.value = clamp(v, +el.min, +el.max);
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    setRange('sizeRange', cfg.size);
+    setRange('spreadRange', cfg.sizeSpread);
+    setRange('waveRange', cfg.waveCount);
+    setRange('staggerRange', cfg.staggerStep);
+    setRange('densityRange', cfg.density);
+    setRange('gravRange', cfg.gravity);
+    setRange('massRange', cfg.mass);
+    setRange('restRange', cfg.restitution);
+    setRange('dampRange', cfg.damping);
+    setRange('maxSpdRange', cfg.maxSpeed);
+    setRange('impactRange', cfg.impactSpeedMin);
+    setRange('burstRange', cfg.burstCount);
+    setRange('cooldownRange', cfg.burstCooldown);
+    setRange('jumpSensRange', cfg.jumpSensitivity);
+    setRange('shakeSensRange', cfg.shakeSensitivity);
+    if(typeof cfg.particlesEnabled === 'boolean'){
+      particlesEnabled = cfg.particlesEnabled;
+      document.getElementById('partToggle').checked = cfg.particlesEnabled;
+    }
+    if(cfg.playMode === 'random' || cfg.playMode === 'sequential'){
+      playMode = cfg.playMode;
+      const r = document.querySelector('input[name=playMode][value="' + cfg.playMode + '"]');
+      if(r) r.checked = true;
+    }
+    if(cfg.advanced === true){
+      document.getElementById('advToggle').checked = true;
+      document.getElementById('advanced').style.display = 'block';
+    }
+    if(cfg.useCustom === true && typeof cfg.customImage === 'string' && cfg.customImage){
+      customImage = cfg.customImage;
+      useCustom = true;
+      document.getElementById('useCustomToggle').checked = true;
+      setCurrentImage(customImage);
+    }
+    if(typeof cfg.musicDir === 'string') musicDir = cfg.musicDir;
+  }
+  window.addEventListener('beforeunload', () => { if(configReady) persistConfig(); });
+
+  // ---------- 滑杆绑定 ----------
+  function bindRange(id, valId, apply, fmt){
+    const input = document.getElementById(id);
+    const val = document.getElementById(valId);
+    const show = (v) => { val.textContent = fmt ? fmt(v) : v; };
+    show(+input.value);
+    apply(+input.value);
+    input.oninput = () => { const v = +input.value; show(v); apply(v); saveConfigSoon(); };
+  }
+
+  bindRange('gravRange', 'gravVal', v => gravity = v, v => Math.round(v));
+  bindRange('massRange', 'massVal', v => mass = v, v => v.toFixed(1));
+  bindRange('restRange', 'restVal', v => restitution = v, v => v.toFixed(2));
+  bindRange('dampRange', 'dampVal', v => damping = v, v => v.toFixed(1));
+  bindRange('maxSpdRange', 'maxSpdVal', v => maxSpeed = v, v => Math.round(v));
+  bindRange('impactRange', 'impactVal', v => impactSpeedMin = v, v => Math.round(v));
+  bindRange('burstRange', 'burstVal', v => burstCount = v, v => Math.round(v));
+  bindRange('cooldownRange', 'cooldownVal', v => burstCooldown = v, v => v.toFixed(2));
+  bindRange('jumpSensRange', 'jumpSensVal', v => jumpSensitivity = v, v => v.toFixed(1));
+  bindRange('shakeSensRange', 'shakeSensVal', v => shakeSensitivity = v, v => v.toFixed(1));
+  bindRange('spreadRange', 'spreadVal', v => sizeSpread = v, v => '±' + Math.round(v * 100) + '%');
+  bindRange('waveRange', 'waveVal', v => waveCount = v, v => Math.round(v));
+  bindRange('staggerRange', 'staggerVal', v => staggerStep = v, v => Math.round(v) + 'ms');
+  bindRange('densityRange', 'densityVal', v => { density = v; rebalance(); }, v => v.toFixed(2) + '×');
+  document.getElementById('partToggle').onchange = (e) => { particlesEnabled = e.target.checked; saveConfigSoon(); };
+
+  bindRange('sizeRange', 'sizeVal', v => {
+    const old = size; size = v;
+    const k = size / old;
+    for(const a of avatars){
+      a.size *= k; a.r *= k;
+      a.el.style.width = a.size + 'px';
+      a.el.style.height = a.size + 'px';
+    }
+  }, v => Math.round(v) + 'px');
+
+  document.querySelectorAll('input[name=playMode]').forEach(r => {
+    r.onchange = () => { if(r.checked){ playMode = r.value; saveConfigSoon(); } };
+  });
+
+  // ---------- 音频元数据 / 封面解析 ----------
+  const AUDIO_RE = /\.(mp3|m4a|aac|flac|ogg|oga|opus|wav|mp4)$/i;
+  function isAudioName(name){ return AUDIO_RE.test(name); }
+  function stripExt(name){ const i = name.lastIndexOf('.'); return i > 0 ? name.slice(0, i) : name; }
+
+  function decodeLatin(bytes){ let s=''; for(let i=0;i<bytes.length;i++) s += String.fromCharCode(bytes[i]); return s; }
+  function decodeUTF16(bytes){
+    let arr;
+    if(bytes.length >= 2 && bytes[0]===0xFF && bytes[1]===0xFE) arr = new Uint16Array(bytes.buffer, bytes.byteOffset+2, (bytes.length-2)/2);
+    else if(bytes.length >= 2 && bytes[0]===0xFE && bytes[1]===0xFF){ arr = new Uint16Array(bytes.length/2); for(let i=0;i<arr.length;i++) arr[i]=(bytes[i*2]<<8)|bytes[i*2+1]; }
+    else arr = new Uint16Array(bytes.buffer, bytes.byteOffset, Math.floor(bytes.length/2));
+    let s=''; for(let i=0;i<arr.length;i++) s += String.fromCharCode(arr[i]); return s;
+  }
+  function decodeUTF8(bytes){ try { return new TextDecoder('utf-8').decode(bytes); } catch(e){ return decodeLatin(bytes); } }
+  function decodeText(bytes, enc){
+    if(enc === 1 || enc === 2) return decodeUTF16(bytes);
+    if(enc === 3) return decodeUTF8(bytes);
+    return decodeLatin(bytes);
+  }
+  function indexOfNull(bytes, start, enc){
+    if(enc === 1 || enc === 2){ for(let i=start; i+1<bytes.length; i+=2){ if(bytes[i]===0 && bytes[i+1]===0) return i; } }
+    else { for(let i=start; i<bytes.length; i++){ if(bytes[i]===0) return i; } }
+    return bytes.length;
+  }
+  function bytesToBlobURL(bytes, mime){
+    try { return URL.createObjectURL(new Blob([bytes], { type: mime || 'image/jpeg' })); }
+    catch(e){ return null; }
+  }
+
+  function syncsafe32(b0,b1,b2,b3){ return ((b0&0x7f)<<21)|((b1&0x7f)<<14)|((b2&0x7f)<<7)|(b3&0x7f); }
+
+  function parseTextFrame(body){
+    if(body.length < 1) return '';
+    const enc = body[0];
+    return decodeText(body.slice(1), enc).replace(/\0+$/,'').trim();
+  }
+  function parseAPIC(body){
+    if(body.length < 4) return null;
+    const enc = body[0];
+    let i = 1;
+    const mimeEnd = indexOfNull(body, i, enc);
+    const mime = decodeLatin(body.slice(i, mimeEnd)).toLowerCase();
+    i = mimeEnd + (enc===1||enc===2 ? 2 : 1);
+    i += 1;
+    const descEnd = indexOfNull(body, i, enc);
+    i = descEnd + (enc===1||enc===2 ? 2 : 1);
+    const data = body.slice(i);
+    if(data.length < 16) return null;
+    const url = bytesToBlobURL(data, mime || 'image/jpeg');
+    return url ? { url, mime: mime || 'image/jpeg' } : null;
+  }
+  function parseID3v2(buf){
+    const u8 = new Uint8Array(buf);
+    if(u8.length < 10 || u8[0]!==0x49 || u8[1]!==0x44 || u8[2]!==0x33) return null;
+    const ver = u8[3], flags = u8[5];
+    const tagSize = syncsafe32(u8[6],u8[7],u8[8],u8[9]);
+    let off = 10;
+    if(flags & 0x40){
+      if(off + 4 > u8.length) return null;
+      const exsz = ver===4 ? syncsafe32(u8[off],u8[off+1],u8[off+2],u8[off+3]) : (u8[off]<<24|u8[off+1]<<16|u8[off+2]<<8|u8[off+3]);
+      off += exsz;
+    }
+    const end = Math.min(10 + tagSize, u8.length);
+    const meta = { title:'', artist:'', cover:null };
+    while(off + 10 <= end){
+      const fid = String.fromCharCode(u8[off],u8[off+1],u8[off+2],u8[off+3]);
+      if(!/[A-Z0-9]{4}/.test(fid)) break;
+      const fsz = ver===4 ? syncsafe32(u8[off+4],u8[off+5],u8[off+6],u8[off+7]) : (u8[off+4]<<24|u8[off+5]<<16|u8[off+6]<<8|u8[off+7]);
+      if(fsz <= 0 || off + 10 + fsz > end) break;
+      const body = u8.slice(off+10, off+10+fsz);
+      if(fid === 'APIC') meta.cover = parseAPIC(body);
+      else if(fid === 'TIT2') meta.title = parseTextFrame(body);
+      else if(fid === 'TPE1') meta.artist = parseTextFrame(body);
+      off += 10 + fsz;
+    }
+    return meta;
+  }
+
+  function fourcc(u8, off){ return String.fromCharCode(u8[off],u8[off+1],u8[off+2],u8[off+3]); }
+  function u32(u8, off){ return (u8[off]<<24)|(u8[off+1]<<16)|(u8[off+2]<<8)|u8[off+3]; }
+  function findChild(u8, parentOff, parentEnd, type){
+    let off = parentOff;
+    while(off + 8 <= parentEnd){
+      let size = u32(u8, off);
+      const t = fourcc(u8, off+4);
+      let hdr = 8;
+      if(size === 1){ size = u32(u8, off+12); hdr = 16; }
+      else if(size === 0){ size = parentEnd - off; }
+      if(size < 8) break;
+      if(t === type) return { off: off + hdr, size: size - hdr };
+      off += size;
+    }
+    return null;
+  }
+  function parseMP4Text(u8, off, size){
+    const d = findChild(u8, off, off+size, 'data');
+    if(!d || d.size < 8) return '';
+    return decodeUTF8(u8.slice(d.off + 8, d.off + d.size)).replace(/\0+$/,'').trim();
+  }
+  function parseMP4Covr(u8, off, size){
+    const d = findChild(u8, off, off+size, 'data');
+    if(d && d.size >= 16){
+      const typeVal = u32(u8, d.off);
+      const data = u8.slice(d.off + 8, d.off + d.size);
+      const mime = (typeVal === 14) ? 'image/png' : 'image/jpeg';
+      const url = bytesToBlobURL(data, mime);
+      return url ? { url, mime } : null;
+    }
+    if(size > 8){
+      const typeVal = u32(u8, off);
+      const data = u8.slice(off + 4, off + size);
+      if(data.length < 16) return null;
+      const mime = (typeVal === 14) ? 'image/png' : 'image/jpeg';
+      const url = bytesToBlobURL(data, mime);
+      return url ? { url, mime } : null;
+    }
+    return null;
+  }
+  function parseMP4(buf){
+    const u8 = new Uint8Array(buf);
+    if(u8.length < 12) return null;
+    const meta = { title:'', artist:'', cover:null };
+    let moov = null, off = 0;
+    while(off + 8 <= u8.length){
+      let size = u32(u8, off);
+      const t = fourcc(u8, off+4);
+      let hdr = 8;
+      if(size === 1){ size = u32(u8, off+12); hdr = 16; }
+      else if(size === 0){ size = u8.length - off; }
+      if(size < 8) break;
+      if(t === 'moov'){ moov = { off: off + hdr, size: size - hdr }; break; }
+      off += size;
+    }
+    if(!moov) return meta;
+    const udta = findChild(u8, moov.off, moov.off + moov.size, 'udta');
+    if(udta){
+      const metaBox = findChild(u8, udta.off, udta.off + udta.size, 'meta');
+      if(metaBox){
+        const ilst = findChild(u8, metaBox.off + 4, metaBox.off + metaBox.size, 'ilst');
+        if(ilst){
+          let p = ilst.off, pend = ilst.off + ilst.size;
+          while(p + 8 <= pend){
+            let sz = u32(u8, p);
+            const tt = fourcc(u8, p+4);
+            let hd = 8;
+            if(sz === 1){ sz = u32(u8, p+12); hd = 16; }
+            else if(sz === 0){ sz = pend - p; }
+            if(sz < 8) break;
+            const bodyOff = p + hd, bodySize = sz - hd;
+            if(tt === 'covr') meta.cover = parseMP4Covr(u8, bodyOff, bodySize);
+            else if(tt === '\u00a9nam') meta.title = parseMP4Text(u8, bodyOff, bodySize);
+            else if(tt === '\u00a9ART') meta.artist = parseMP4Text(u8, bodyOff, bodySize);
+            p += sz;
+          }
+        }
+      }
+    }
+    return meta;
+  }
+
+  // ---------- FLAC 封面 / 元数据 ----------
+  function findFlacOffset(u8){
+    const limit = Math.min(u8.length - 4, 128 * 1024);
+    for(let i = 0; i <= limit; i++){
+      if(u8[i] === 0x66 && u8[i+1] === 0x4C && u8[i+2] === 0x61 && u8[i+3] === 0x43) return i;
+    }
+    return -1;
+  }
+  function le32(u8, off){ return (u8[off] | (u8[off+1]<<8) | (u8[off+2]<<16) | (u8[off+3]<<24)) >>> 0; }
+  function be32(u8, off){ return ((u8[off]<<24) | (u8[off+1]<<16) | (u8[off+2]<<8) | u8[off+3]) >>> 0; }
+
+  function parseVorbisComment(u8, off, len){
+    const end = off + len;
+    let p = off;
+    if(p + 4 > end) return null;
+    const vendorLen = le32(u8, p); p += 4 + vendorLen;
+    if(p + 4 > end) return null;
+    const count = le32(u8, p); p += 4;
+    const meta = { title:'', artist:'' };
+    for(let i = 0; i < count && p + 4 <= end; i++){
+      const clen = le32(u8, p); p += 4;
+      if(p + clen > end) break;
+      const s = decodeUTF8(u8.subarray(p, p + clen));
+      p += clen;
+      const eq = s.indexOf('=');
+      if(eq < 0) continue;
+      const key = s.slice(0, eq).toUpperCase();
+      const val = s.slice(eq + 1);
+      if(key === 'TITLE' && !meta.title) meta.title = val;
+      else if(key === 'ARTIST' && !meta.artist) meta.artist = val;
+    }
+    return meta;
+  }
+  function parseFlacPicture(u8, off, len){
+    const end = off + len;
+    let p = off;
+    if(p + 4 > end) return null;
+    p += 4; // picture type (3 = front cover)
+    if(p + 4 > end) return null;
+    const mimeLen = be32(u8, p); p += 4;
+    if(p + mimeLen > end) return null;
+    const mime = decodeLatin(u8.subarray(p, p + mimeLen)).replace(/\0+$/,'').toLowerCase();
+    p += mimeLen;
+    if(p + 4 > end) return null;
+    const descLen = be32(u8, p); p += 4 + descLen;
+    if(p + 16 > end) return null;
+    p += 16; // width, height, depth, colors
+    if(p + 4 > end) return null;
+    const dataLen = be32(u8, p); p += 4;
+    if(p + dataLen > end) return null;
+    const data = u8.subarray(p, p + dataLen);
+    const url = bytesToBlobURL(data, mime || 'image/jpeg');
+    return url ? { url, mime: mime || 'image/jpeg' } : null;
+  }
+  function parseFlac(buf, start){
+    const u8 = new Uint8Array(buf);
+    let off = start + 4; // 跳过 "fLaC"
+    const meta = { title:'', artist:'', cover:null };
+    while(off + 4 <= u8.length){
+      const hdr = u8[off];
+      const type = hdr & 0x7f;
+      const last = (hdr & 0x80) !== 0;
+      const len = (u8[off+1]<<16) | (u8[off+2]<<8) | u8[off+3];
+      off += 4;
+      if(off + len > u8.length) break;
+      if(type === 4){ // VORBIS_COMMENT
+        const vc = parseVorbisComment(u8, off, len);
+        if(vc){ if(vc.title && !meta.title) meta.title = vc.title; if(vc.artist && !meta.artist) meta.artist = vc.artist; }
+      } else if(type === 6){ // PICTURE
+        if(!meta.cover) meta.cover = parseFlacPicture(u8, off, len);
+      }
+      off += len;
+      if(last) break;
+    }
+    return meta;
+  }
+
+  function makePlaceholderCover(title){
+    if(DEFAULT_COVER) return DEFAULT_COVER;
+    try {
+      const c = document.createElement('canvas');
+      c.width = 128; c.height = 128;
+      const ctx = c.getContext('2d');
+      let h = 0; const s = String(title || '');
+      for(let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+      ctx.fillStyle = 'hsl(' + h + ',55%,52%)';
+      ctx.beginPath(); ctx.arc(64, 64, 64, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '60px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('♪', 64, 68);
+      return c.toDataURL('image/png');
+    } catch(e){ return null; }
+  }
+
+  function parseAudioMeta(buf, name){
+    const u8 = new Uint8Array(buf);
+    let meta = { title:'', artist:'', cover:null };
+    if(u8.length >= 3 && u8[0]===0x49 && u8[1]===0x44 && u8[2]===0x33){
+      const m = parseID3v2(buf); if(m){ meta.title = m.title; meta.artist = m.artist; meta.cover = m.cover; }
+    } else if(u8.length >= 8 && fourcc(u8,4) === 'ftyp'){
+      const m = parseMP4(buf); if(m){ meta.title = m.title; meta.artist = m.artist; meta.cover = m.cover; }
+    }
+    // FLAC（可能带 ID3 前缀）
+    const flacOff = findFlacOffset(u8);
+    if(flacOff >= 0){
+      const m = parseFlac(buf, flacOff);
+      if(m){
+        if(!meta.title) meta.title = m.title;
+        if(!meta.artist) meta.artist = m.artist;
+        if(!meta.cover) meta.cover = m.cover;
+      }
+    }
+    if(!meta.title) meta.title = stripExt(name);
+    return meta;
+  }
+
+  // ---------- 播放器 ----------
+  let playlist = [];
+  let currentTrack = -1;
+  let history = [];
+  let playMode = 'random';
+  const audio = document.getElementById('audio');
+  let autoplayBlocked = false;
+
+  function loadCover(track){
+    if(track._coverPromise) return track._coverPromise;
+    track._coverPromise = new Promise(resolve => {
+      const finish = (buf) => {
+        let m = { title:'', artist:'', cover:null };
+        try { m = parseAudioMeta(buf, track.name); } catch(e){}
+        track.title = m.title || track.name;
+        track.artist = m.artist || '';
+        resolve({ url: m.cover ? m.cover.url : makePlaceholderCover(track.title) });
+      };
+      if(track.buf){ finish(track.buf); return; }
+      if(!track.file){ resolve({ url: makePlaceholderCover(track.name) }); return; }
+      const r = new FileReader();
+      r.onload = () => finish(r.result);
+      r.onerror = () => resolve({ url: makePlaceholderCover(track.name) });
+      r.readAsArrayBuffer(track.file);
+    });
+    return track._coverPromise;
+  }
+
+  function playNow(){
+    const p = audio.play();
+    if(p && p.catch) p.catch(() => { autoplayBlocked = true; });
+  }
+
+  // ---------- 本地路径音轨（Electron：无需授权，直接读文件） ----------
+  const MIME_BY_EXT = {
+    mp3:'audio/mpeg', m4a:'audio/mp4', aac:'audio/aac', flac:'audio/flac',
+    ogg:'audio/ogg', oga:'audio/ogg', opus:'audio/ogg', wav:'audio/wav', mp4:'audio/mp4'
+  };
+  async function ensureTrackReady(t){
+    if(t.url) return true;
+    if(!t.path || !window.bopple || !window.bopple.readFile) return false;
+    const raw = await window.bopple.readFile(t.path);
+    const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw);
+    const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    const ext = String(t.ext || '').toLowerCase();
+    t.buf = buf;
+    t.file = new File([buf], (t.name || 'track') + (ext ? '.' + ext : ''), { type: MIME_BY_EXT[ext] || 'audio/mpeg' });
+    t.url = URL.createObjectURL(t.file);
+    return true;
+  }
+
+  let selectSeq = 0;
+  async function selectTrack(i){
+    if(!playlist.length) return;
+    const idx = ((i % playlist.length) + playlist.length) % playlist.length;
+    currentTrack = idx;
+    const t = playlist[idx];
+    const seq = ++selectSeq;
+    ensureAudioGraph();
+    updatePlayerUI();
+    if(!t.url){
+      try { await ensureTrackReady(t); } catch(e){}
+      if(seq !== selectSeq) return;
+      if(!t.url){ updatePlayerUI(); return; }
+    }
+    audio.src = t.url;
+    playNow();
+    updatePlayerUI();
+    let cover = { url: makePlaceholderCover(t.name) };
+    try { cover = await loadCover(t); } catch(e){}
+    if(seq !== selectSeq) return;
+    currentCoverUrl = cover.url;
+    dropOutAll();
+    setCurrentImage(useCustom && customImage ? customImage : cover.url, (col) => {
+      for(const a of avatars){ if(!a.exiting) a.color = { r:col.r, g:col.g, b:col.b }; }
+    });
+    spawnWave();
+    updatePlayerUI();
+  }
+
+  function nextTrack(){
+    if(!playlist.length) return;
+    let n;
+    if(playMode === 'random' && playlist.length > 1){
+      do { n = Math.floor(Math.random() * playlist.length); } while(n === currentTrack);
+    } else {
+      n = (currentTrack + 1) % playlist.length;
+    }
+    if(currentTrack >= 0) history.push(currentTrack);
+    if(history.length > playlist.length) history.shift();
+    selectTrack(n);
+  }
+  function prevTrack(){
+    if(!playlist.length) return;
+    const n = history.length ? history.pop() : ((currentTrack - 1 + playlist.length) % playlist.length);
+    selectTrack(n);
+  }
+
+  function revokePlaylistUrls(list){
+    for(const t of list){
+      if(t && typeof t.url === 'string' && t.url.indexOf('blob:') === 0){
+        try { URL.revokeObjectURL(t.url); } catch(e){}
+      }
+    }
+  }
+
+  function addFiles(fileList, pickRandom){
+    const files = Array.from(fileList).filter(f => isAudioName(f.name));
+    if(!files.length){ alert(tr('noAudioFound')); return; }
+    const old = playlist;
+    playlist = [];
+    currentTrack = -1;
+    history = [];
+    selectSeq++;
+    for(const a of avatars.slice()) destroyBall(a);
+    particles.length = 0;
+    revokePlaylistUrls(old);
+    for(const f of files){
+      const dot = f.name.lastIndexOf('.');
+      const ext = dot > 0 ? f.name.slice(dot + 1).toLowerCase() : '';
+      const track = { file:f, name:stripExt(f.name), title:stripExt(f.name), artist:'', cover:null, ext, url:URL.createObjectURL(f) };
+      playlist.push(track);
+    }
+    document.getElementById('player').hidden = false;
+    hideBgHint();
+    if(pickRandom && playlist.length > 1){
+      selectTrack(Math.floor(Math.random() * playlist.length));
+    } else if(playlist.length){
+      selectTrack(0);
+    }
+  }
+
+  // Electron：直接用本地路径建播放列表（无需任何授权弹窗）
+  function addPathTracks(list, pickRandom){
+    if(!list || !list.length){ alert(tr('noAudioFound')); return; }
+    const old = playlist;
+    playlist = [];
+    currentTrack = -1;
+    history = [];
+    selectSeq++;
+    for(const a of avatars.slice()) destroyBall(a);
+    particles.length = 0;
+    revokePlaylistUrls(old);
+    for(const item of list){
+      const full = item.name || String(item.path || '').split(/[\\/]/).pop() || 'track';
+      const dot = full.lastIndexOf('.');
+      const ext = dot > 0 ? full.slice(dot + 1).toLowerCase() : '';
+      playlist.push({ path:item.path, name:stripExt(full), title:stripExt(full), artist:'', cover:null, ext, url:null });
+    }
+    document.getElementById('player').hidden = false;
+    hideBgHint();
+    if(pickRandom && playlist.length > 1){
+      selectTrack(Math.floor(Math.random() * playlist.length));
+    } else {
+      selectTrack(0);
+    }
+  }
+
+  const ICON_PLAY = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>';
+
+  function updatePlayerUI(){
+    const t = (currentTrack >= 0) ? playlist[currentTrack] : null;
+    document.getElementById('playerTitle').textContent = t ? t.title : '-';
+    document.getElementById('playerArtist').textContent = t ? t.artist : '';
+    document.getElementById('btnPlay').innerHTML = audio.paused ? ICON_PLAY : ICON_PAUSE;
+    const np = document.getElementById('nowPlaying');
+    if(t) np.innerHTML = tr('nowPlaying') + '<b>' + escapeHtml(t.title) + '</b>' + (t.artist ? '<br>' + tr('artist') + escapeHtml(t.artist) : '');
+    else np.textContent = tr('noMusic');
+  }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function fmtTime(s){
+    if(!isFinite(s) || s < 0) s = 0;
+    const m = Math.floor(s / 60), ss = Math.floor(s % 60);
+    return m + ':' + String(ss).padStart(2, '0');
+  }
+
+  document.getElementById('btnPlay').onclick = () => {
+    ensureAudioGraph();
+    if(audio.paused) playNow(); else audio.pause();
+  };
+  document.getElementById('btnNext').onclick = nextTrack;
+  document.getElementById('btnPrev').onclick = prevTrack;
+
+  audio.addEventListener('play', () => { if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{}); updatePlayerUI(); });
+  audio.addEventListener('pause', updatePlayerUI);
+  audio.addEventListener('ended', nextTrack);
+  audio.addEventListener('timeupdate', () => {
+    const seek = document.getElementById('seek');
+    if(isFinite(audio.duration) && audio.duration > 0){
+      seek.max = 1000;
+      seek.value = Math.round((audio.currentTime / audio.duration) * 1000);
+    }
+    document.getElementById('playerTime').textContent = fmtTime(audio.currentTime) + ' / ' + fmtTime(audio.duration);
+  });
+  document.getElementById('seek').addEventListener('input', (e) => {
+    if(isFinite(audio.duration) && audio.duration > 0){
+      audio.currentTime = (e.target.value / 1000) * audio.duration;
+    }
+  });
+
+  document.addEventListener('pointerdown', () => {
+    if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+    if(autoplayBlocked && audio.src && audio.paused){ audio.play().catch(()=>{}); autoplayBlocked = false; }
+  });
+
+  // ---------- 音乐输入 ----------
+  function bindMusicInput(inputId, pickRandom){
+    const input = document.getElementById(inputId);
+    const btn = (inputId === 'musicFiles') ? document.getElementById('btnPickMusic') : document.getElementById('btnPickFolder');
+    btn.onclick = () => {
+      if(inputId === 'musicFolder'){ pickFolder(); }
+      else input.click();
+    };
+    input.onchange = (e) => {
+      addFiles(e.target.files, pickRandom);
+      e.target.value = '';
+    };
+  }
+  bindMusicInput('musicFiles', false);
+  bindMusicInput('musicFolder', true);
+
+  // ---------- 背景提示 / 点击背景选文件夹 / 文件夹记忆 ----------
+  const bgHintEl = document.getElementById('bgHint');
+  function guideHtml(){
+    return '<div class="guide-wrap">' +
+      '<img class="guide-logo" src="' + DEFAULT_COVER + '" alt="">' +
+      '<div class="tap-guide"><span class="tap-ring"></span><span class="tap-ring r2"></span>' +
+      '<svg class="tap-hand" viewBox="0 0 24 24" width="38" height="38" fill="currentColor"><path d="M6 3l13 7-6.5 1.6L10 18 6 3z"/></svg></div>' +
+      '<div class="guide-text">' + tr('tapToPick') + '</div>' +
+      '</div>';
+  }
+  function showGuide(){ bgHintEl.className = 'bg-hint'; bgHintEl.innerHTML = guideHtml(); }
+  function showBgHint(text){ bgHintEl.className = 'bg-hint text'; bgHintEl.textContent = text; }
+  function hideBgHint(){ bgHintEl.classList.add('hidden'); }
+
+  let picking = false;
+  let pendingRestore = null;
+
+  const DB_NAME = 'cma_fs', DB_STORE = 'handles';
+  function idbOpen(){
+    return new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open(DB_NAME, 1);
+        r.onupgradeneeded = () => r.result.createObjectStore(DB_STORE);
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      } catch(e){ rej(e); }
+    });
+  }
+  function idbGet(key){
+    return idbOpen().then(db => new Promise((res) => {
+      try {
+        const tx = db.transaction(DB_STORE, 'readonly');
+        const rq = tx.objectStore(DB_STORE).get(key);
+        rq.onsuccess = () => res(rq.result);
+        rq.onerror = () => res(null);
+      } catch(e){ res(null); }
+    })).catch(() => null);
+  }
+  function idbSet(key, val){
+    return idbOpen().then(db => new Promise((res) => {
+      try {
+        const tx = db.transaction(DB_STORE, 'readwrite');
+        tx.objectStore(DB_STORE).put(val, key);
+        tx.oncomplete = () => res();
+        tx.onerror = () => res();
+      } catch(e){ res(); }
+    })).catch(() => {});
+  }
+
+  async function collectFolderFiles(handle){
+    const files = [];
+    for await (const entry of handle.values()){
+      if(entry.kind === 'file' && isAudioName(entry.name)){
+        try { files.push(await entry.getFile()); } catch(e){}
+      }
+    }
+    return files;
+  }
+
+  async function loadFolderHandle(handle){
+    try {
+      const files = await collectFolderFiles(handle);
+      if(files.length){ addFiles(files, true); }
+      else { showBgHint(tr('noMusicInFolder')); }
+    } catch(e){
+      showBgHint(tr('readFolderFail'));
+    }
+  }
+
+  async function pickFolder(){
+    if(picking) return;
+    picking = true;
+    try {
+      // Electron：系统对话框选文件夹 → 直接读取，并记住路径供下次自动加载
+      if(window.bopple && window.bopple.pickFolder){
+        let dir = null;
+        try { dir = await window.bopple.pickFolder(); } catch(e){ dir = null; }
+        if(!dir) return;
+        let list = [];
+        try { list = await window.bopple.scanFolder(dir); } catch(e){ list = []; }
+        if(!list.length){ showBgHint(tr('noMusicInFolder')); return; }
+        musicDir = dir;
+        saveConfigSoon();
+        hideBgHint();
+        addPathTracks(list, true);
+        persistConfig();
+        return;
+      }
+      if(window.showDirectoryPicker){
+        let handle = null;
+        try {
+          handle = await window.showDirectoryPicker();
+        } catch(e){
+          if(e && e.name === 'AbortError'){ return; } // 用户取消
+          handle = null; // 接口不可用（如 file:// 非安全上下文），回落系统选择框
+        }
+        if(handle){
+          try { await idbSet('lastDir', handle); } catch(e){}
+          hideBgHint();
+          await loadFolderHandle(handle);
+          return;
+        }
+      }
+      // 兜底：webkitdirectory 输入框（一定可用）
+      document.getElementById('musicFolder').click();
+    } finally {
+      picking = false;
+    }
+  }
+
+  async function handleBackgroundTap(){
+    if(picking || playlist.length) return;
+    if(pendingRestore){
+      const h = pendingRestore; pendingRestore = null;
+      try {
+        const perm = await h.requestPermission({ mode: 'read' });
+        if(perm === 'granted'){ hideBgHint(); await loadFolderHandle(h); return; }
+      } catch(e){}
+    }
+    await pickFolder();
+  }
+
+  stage.addEventListener('click', (e) => {
+    if(e.target === stage) handleBackgroundTap();
+  });
+
+  async function initRestore(){
+    try {
+      if(!window.showDirectoryPicker || !window.indexedDB){ showGuide(); return; }
+      const handle = await idbGet('lastDir');
+      if(!handle){ showGuide(); return; }
+      const perm = await handle.queryPermission({ mode: 'read' });
+      if(perm === 'granted'){
+        hideBgHint();
+        await loadFolderHandle(handle);
+      } else {
+        pendingRestore = handle;
+        showBgHint(tr('tapToContinue'));
+      }
+    } catch(e){ showGuide(); }
+  }
+
+  // ---------- 初始化 ----------
+  async function initMusic(cfg){
+    // Electron：有记住的文件夹就直接读取，全程不弹授权 / 询问
+    if(window.bopple){
+      if(cfg && typeof cfg.musicDir === 'string' && cfg.musicDir){
+        try {
+          if(await window.bopple.folderExists(cfg.musicDir)){
+            const list = await window.bopple.scanFolder(cfg.musicDir);
+            if(list && list.length){ musicDir = cfg.musicDir; addPathTracks(list, true); return; }
+            showBgHint(tr('noMusicInFolder'));
+          }
+        } catch(e){}
+      }
+      showGuide();
+      return;
+    }
+    // 浏览器：沿用 File System Access 的授权记忆
+    initRestore();
+  }
+
+  async function boot(){
+    let cfg = {};
+    try { cfg = await loadConfig(); } catch(e){ cfg = {}; }
+    try { applyConfig(cfg); } catch(e){}
+    if(cfg.lang === 'en' || cfg.lang === 'zh'){
+      lang = cfg.lang;
+    } else {
+      try { const saved = localStorage.getItem('cma_lang'); if(saved === 'en' || saved === 'zh') lang = saved; } catch(e){}
+    }
+    configReady = true;
+    applyLang();
+    renderPreview();
+    updateCount();
+    try { await initMusic(cfg); } catch(e){ showGuide(); }
+  }
+
+  applyLang();
+  renderPreview();
+  updateCount();
+  boot();
+</script>
+</body>
+</html>
